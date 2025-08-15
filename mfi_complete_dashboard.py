@@ -124,7 +124,7 @@ def get_table_columns(cursor, schema, table):
 st.markdown("""
 <style>
     .block-container {
-        padding-top: 5px;
+        padding-top: 0px;
     }
     .stApp > div > div {
         background-color: rgba(0, 0, 0, 0);
@@ -465,6 +465,7 @@ if st.button('Submit'):
             st.page_link("https://cenfriglobal.sharepoint.com/:x:/r/sites/ClientMastercardFoundation/Shared%20Documents/2.%20REDP2/08.%20Data%20Hub/MCFD2412%20-%20AD%20Finance%20analytics/Analytical%20framework/Final%20Version/AD%20Finance%20Analytical%20framework_with%20tables_columns.xlsb.xlsx?d=w23c7e5eeb11a4cf891be379f35562294&csf=1&web=1&e=zZ2yvq", label="Check Details", icon="🗒️")
 
                     
+
 
 
 

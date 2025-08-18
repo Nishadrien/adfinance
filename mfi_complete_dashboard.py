@@ -422,7 +422,7 @@ if st.button('Submit'):
                 metrics = []
 
             # Define colors based on percentage
-            colors = ['#8B0000' if val < 60 else 'yellow' if 60 <= val < 90 else 'green' if val==100 else '#36A2EB' for val in metrics]
+            colors = ['#FF0000' if val < 75 else '#FFFF00' if 75 <= val < 85 else '#008000' for val in metrics]
 
             # Create bar chart
             fig = go.Figure(data=[
@@ -462,6 +462,7 @@ if st.button('Submit'):
             st.page_link("https://cenfriglobal.sharepoint.com/:x:/r/sites/ClientMastercardFoundation/Shared%20Documents/2.%20REDP2/08.%20Data%20Hub/MCFD2412%20-%20AD%20Finance%20analytics/Analytical%20framework/Final%20Version/AD%20Finance%20Analytical%20framework_with%20tables_columns.xlsb.xlsx?d=w23c7e5eeb11a4cf891be379f35562294&csf=1&web=1&e=zZ2yvq", label="Check Details", icon="🗒️")
 
                     
+
 
 
 

@@ -5,10 +5,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import re
 from datetime import datetime
+
 st.set_page_config(
     page_title="AD Finance - Data Quality Assessment",
     page_icon="📊"
 )
+
 # Database connection details for MFIs
 conn_info_mfi = {
     'dbname': 'mfis',
@@ -28,7 +30,6 @@ mfis_schemas = [
 ]
 
 # Table mapping
-
 table_mapping = {
     'Clients': 'ad_cli',
     'Accounts': 'ad_cpt',
@@ -96,14 +97,14 @@ dcr_integrity_cols = ['id_doss_unique', 'id_client_unique']
 # Columns per metric for ad_etr
 etr_completeness_cols = etr_columns
 etr_conformity_cols = ['date_ech']
-etr_uniqueness_cols = ['id_ech_unique']  # Only id_ech for uniqueness
+etr_uniqueness_cols = ['id_ech_unique']
 etr_validity_cols = ['mnt_cap', 'mnt_int']
 etr_integrity_cols = ['id_ech_unique', 'id_doss_unique']
 
 # Columns per metric for ad_sre
 sre_completeness_cols = sre_columns
 sre_conformity_cols = ['date_remb']
-sre_uniqueness_cols = ['id_ech_unique', 'date_remb']  # id_ech and date_remb for uniqueness
+sre_uniqueness_cols = ['id_ech_unique', 'date_remb']
 sre_validity_cols = ['mnt_remb_cap', 'mnt_remb_int']
 sre_integrity_cols = ['id_ech_unique', 'id_doss_unique']
 
@@ -124,7 +125,7 @@ def get_table_columns(cursor, schema, table):
     cursor.execute(query, (schema, table))
     return [row[0] for row in cursor.fetchall()]
 
-# Streamlit app
+# Streamlit CSS styling
 st.markdown("""
 <style>
     .block-container {
@@ -134,6 +135,47 @@ st.markdown("""
         background-color: rgba(0, 0, 0, 0);
         padding: 15px;
         border-radius: 10px;
+    }
+    .color-legend {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 10px;
+    }
+    .color-box {
+        width: 20px;
+        height: 20px;
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 5px;
+    }
+    .color-legend span {
+        margin-right: 20px;
+        font-size: 14px;
+    }
+    .general-scores-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    .general-scores-table th, .general-scores-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+    }
+    .general-scores-table th {
+        background-color: #f2f2f2;
+    }
+    .score-good {
+        background-color: #008000;
+        color: white;
+    }
+    .score-warning {
+        background-color: #FFFF00;
+    }
+    .score-bad {
+        background-color: #FF0000;
+        color: white;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -156,6 +198,7 @@ if st.button('Submit'):
         metrics = []
         display_name = table_choice
         used_columns_markdown = ""
+        general_scores = {mfi_choice: []}  # For the table
 
         if table_choice == 'Clients':
             query = f"SELECT {', '.join(cli_columns)} FROM {mfi_choice}.{table_mapping[table_choice]} WHERE statut_juridique = 1"
@@ -274,6 +317,7 @@ if st.button('Submit'):
 
             if metrics_dict:
                 metrics = [round(sum([metrics_dict[table][i] for table in loan_tables]) / len(loan_tables)) for i in range(5)]
+                general_scores[mfi_choice] = metrics
                 used_columns_markdown = """
                 - **Completeness**: All columns from ad_dcr, ad_etr, ad_sre
                 - **Conformity**: date_dem, cre_date_debloc (ad_dcr); date_ech (ad_etr); date_remb (ad_sre)
@@ -286,7 +330,6 @@ if st.button('Submit'):
                 st.error("No valid data retrieved for Loans tables.")
         elif table_choice == 'Transactions':
             try:
-                # Dynamically get available columns for ad_mouvement
                 available_columns = get_table_columns(cursor, mfi_choice, table_mapping[table_choice])
                 selected_columns = [col for col in mouvement_columns if col in available_columns]
                 if not selected_columns:
@@ -368,6 +411,7 @@ if st.button('Submit'):
                 unique_non_null = round(len(df[integrity_cols].drop_duplicates().dropna(how='all')) / total_rows * 100)
 
                 metrics = [completeness, conformity, uniqueness, validity, unique_non_null]
+                general_scores[mfi_choice] = metrics
             elif table_choice == 'Transactions' and not df.empty:
                 total_rows = len(df)
 
@@ -417,6 +461,7 @@ if st.button('Submit'):
                 unique_non_null = round(len(df[integrity_cols].drop_duplicates().dropna(how='all')) / total_rows * 100) if integrity_cols else 100
 
                 metrics = [completeness, conformity, uniqueness, validity, unique_non_null]
+                general_scores[mfi_choice] = metrics
             elif table_choice == 'Transactions' and df.empty:
                 st.error("No valid data retrieved for Transactions table.")
                 metrics = []
@@ -444,6 +489,7 @@ if st.button('Submit'):
             # Display chart and metrics
             st.write(f'Dataset: {mfi_choice} {"(ad_dcr, ad_etr, ad_sre)" if table_choice == "Loans" else table_mapping[table_choice]}')
             st.plotly_chart(fig)
+
             # Display legend below the graph
             st.markdown("""
             <div class="color-legend">
@@ -452,6 +498,33 @@ if st.button('Submit'):
                 <div class="color-box" style="background-color: #FF0000; margin-left: 20px;"></div><span><75% (Low quality)</span>
             </div>
             """, unsafe_allow_html=True)
+
+            # Display table below the legend
+            table_html = """
+            <table class="general-scores-table">
+                <tr>
+                    <th>MFI</th>
+                    <th>Completeness</th>
+                    <th>Conformity</th>
+                    <th>Uniqueness</th>
+                    <th>Validity</th>
+                    <th>Integrity</th>
+                </tr>
+            """
+            for mfi, scores in general_scores.items():
+                table_html += "<tr>"
+                table_html += f"<td>{mfi}</td>"
+                for score in scores:
+                    if score >= 85:
+                        css_class = "score-good"
+                    elif score >= 75:
+                        css_class = "score-warning"
+                    else:
+                        css_class = "score-bad"
+                    table_html += f"<td class='{css_class}'>{score}%</td>"
+                table_html += "</tr>"
+            table_html += "</table>"
+            st.markdown(table_html, unsafe_allow_html=True)
 
             with st.container(border=True):
                 right, middle = st.columns(2)
@@ -468,23 +541,3 @@ if st.button('Submit'):
                     st.subheader('Used Columns')
                     st.markdown(used_columns_markdown)
             st.page_link("https://cenfriglobal.sharepoint.com/:x:/r/sites/ClientMastercardFoundation/Shared%20Documents/2.%20REDP2/08.%20Data%20Hub/MCFD2412%20-%20AD%20Finance%20analytics/Analytical%20framework/Final%20Version/AD%20Finance%20Analytical%20framework_with%20tables_columns.xlsb.xlsx?d=w23c7e5eeb11a4cf891be379f35562294&csf=1&web=1&e=zZ2yvq", label="Check Details", icon="🗒️")
-
-                    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

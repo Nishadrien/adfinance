@@ -444,6 +444,14 @@ if st.button('Submit'):
             # Display chart and metrics
             st.write(f'Dataset: {mfi_choice} {"(ad_dcr, ad_etr, ad_sre)" if table_choice == "Loans" else table_mapping[table_choice]}')
             st.plotly_chart(fig)
+            # Display legend below the graph
+            st.markdown("""
+            <div class="color-legend">
+                <div class="color-box" style="background-color: #008000;"></div><span>85-100% (High quality)</span>
+                <div class="color-box" style="background-color: #FFFF00; margin-left: 20px;"></div><span>75-85% (Moderate quality)</span>
+                <div class="color-box" style="background-color: #FF0000; margin-left: 20px;"></div><span><75% (Low quality)</span>
+            </div>
+            """, unsafe_allow_html=True)
 
             with st.container(border=True):
                 right, middle = st.columns(2)
@@ -462,6 +470,7 @@ if st.button('Submit'):
             st.page_link("https://cenfriglobal.sharepoint.com/:x:/r/sites/ClientMastercardFoundation/Shared%20Documents/2.%20REDP2/08.%20Data%20Hub/MCFD2412%20-%20AD%20Finance%20analytics/Analytical%20framework/Final%20Version/AD%20Finance%20Analytical%20framework_with%20tables_columns.xlsb.xlsx?d=w23c7e5eeb11a4cf891be379f35562294&csf=1&web=1&e=zZ2yvq", label="Check Details", icon="🗒️")
 
                     
+
 
 
 

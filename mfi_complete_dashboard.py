@@ -518,7 +518,6 @@ if st.session_state.data_processed and st.session_state.metrics and st.session_s
 if st.session_state.show_details and st.session_state.data_processed and st.session_state.details_data:
     with st.spinner('Generating detailed metrics table...'):
         try:
-            st.subheader('Detailed Metrics by Column')
             for table in st.session_state.selected_tables:
                 if table in st.session_state.details_data:
                     st.write(f"Table: {table}")
@@ -611,3 +610,4 @@ if st.session_state.show_details and st.session_state.data_processed and st.sess
                     st.error(f"No data available for table {table}.")
         except Exception as e:
             st.error(f"Error generating detailed metrics table: {str(e)}")
+

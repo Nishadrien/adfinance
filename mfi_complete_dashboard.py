@@ -149,6 +149,7 @@ st.markdown("""
     }
     .general-scores-table th, .details-table th {
         background-color: #f2f2f2;
+        color:black;
     }
     .score-good {
         background-color: #008000;
@@ -610,4 +611,5 @@ if st.session_state.show_details and st.session_state.data_processed and st.sess
                     st.error(f"No data available for table {table}.")
         except Exception as e:
             st.error(f"Error generating detailed metrics table: {str(e)}")
+
 

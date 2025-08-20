@@ -77,7 +77,7 @@ cpt_integrity_cols = ['id_cpte_unique', 'id_titulaire_unique']
 
 dcr_completeness_cols = dcr_columns
 dcr_conformity_cols = ['date_dem', 'cre_date_debloc']
-dcr_uniqueness_cols = ['id_doss_unique', 'id_client_unique']
+dcr_uniqueness_cols = ['id_doss_unique', 'id_client_unique]
 dcr_validity_cols = ['etat', 'cre_etat', 'cre_mnt_deb', 'gar_tot']
 dcr_integrity_cols = ['id_doss_unique', 'id_client_unique']
 
@@ -611,5 +611,6 @@ if st.session_state.show_details and st.session_state.data_processed and st.sess
                     st.error(f"No data available for table {table}.")
         except Exception as e:
             st.error(f"Error generating detailed metrics table: {str(e)}")
+
 
 

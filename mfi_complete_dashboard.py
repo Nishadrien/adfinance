@@ -109,6 +109,54 @@ def get_table_columns(cursor, schema, table):
     cursor.execute(query, (schema, table))
     return [row[0] for row in cursor.fetchall()]
 
+# Define check_conformity and check_validity globally
+def check_conformity(col, data):
+    try:
+        if col == 'email':
+            return round(data[col].str.contains(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', na=False).mean() * 100)
+        elif col in ['pp_date_naissance', 'date_adh', 'date_ouvert', 'date_dem', 'cre_date_debloc', 'date_ech', 'date_remb', 'date_valeur']:
+            valid_format = data[col].astype(str).str.match(r'^\d{4}-\d{2}-\d{2}$', na=False)
+            try:
+                valid_date = pd.to_datetime(data[col], errors='coerce', format='%Y-%m-%d')
+                not_future = valid_date <= datetime.now()
+                return round((valid_format & valid_date.notnull() & not_future).mean() * 100)
+            except:
+                return round(valid_format.mean() * 100)
+        elif col == 'devise':
+            return round(data[col].str.match(r'^[A-Z]{3}$', na=False).mean() * 100)
+        return 100
+    except Exception as e:
+        st.error(f"Conformity check failed for {col}: {str(e)}")
+        return 0
+
+def check_validity(col, data):
+    try:
+        if col in ['pp_revenu', 'solde', 'interet_annuel', 'mnt_bloq', 'cre_mnt_deb', 'gar_tot', 'mnt_cap', 'mnt_int', 'mnt_remb_cap', 'mnt_remb_int', 'montant']:
+            return round((pd.to_numeric(data[col], errors='coerce').notnull() & 
+                          (pd.to_numeric(data[col], errors='coerce') >= 0)).mean() * 100)
+        elif col in ['pp_sexe', 'pp_nationalite', 'pp_etat_civil', 'id_loc1', 'etat', 'cre_etat', 'sens', 'devise']:
+            valid_codes = {
+                'pp_sexe': ['M', 'F'],
+                'pp_nationalite': None,
+                'pp_etat_civil': None,
+                'id_loc1': None,
+                'etat': None,
+                'cre_etat': None,
+                'sens': ['D', 'C'],
+                'devise': [r'^[A-Z]{3}$']
+            }
+            if valid_codes.get(col) and isinstance(valid_codes[col], list):
+                return round((data[col].notnull() & data[col].isin(valid_codes[col])).mean() * 100)
+            elif valid_codes.get(col) and isinstance(valid_codes[col], str):
+                return round((data[col].notnull() & data[col].str.match(valid_codes[col], na=False)).mean() * 100)
+            else:
+                return round(data[col].notnull().mean() * 100)
+        else:
+            return round(data[col].notnull().mean() * 100)
+    except Exception as e:
+        st.error(f"Validity check failed for {col}: {str(e)}")
+        return 0
+
 # Streamlit CSS styling
 st.markdown("""
 <style>
@@ -149,7 +197,6 @@ st.markdown("""
     }
     .general-scores-table th, .details-table th {
         background-color: #f2f2f2;
-        color:black;
     }
     .score-good {
         background-color: #008000;
@@ -301,47 +348,19 @@ if st.button('Submit'):
                             total_rows = len(df)
 
                             # Completeness
-                            completeness = (df[completeness_cols].notnull().mean() * 100).mean()
+                            completeness = round((df[completeness_cols].notnull().mean() * 100).mean())
 
                             # Conformity
-                            def check_conformity(col, data):
-                                if col == 'email':
-                                    return data[col].str.contains(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', na=False).mean() * 100
-                                elif col in ['pp_date_naissance', 'date_adh', 'date_ouvert', 'date_dem', 'cre_date_debloc', 'date_ech', 'date_remb', 'date_valeur']:
-                                    valid_format = data[col].astype(str).str.match(r'^\d{4}-\d{2}-\d{2}$', na=False)
-                                    try:
-                                        valid_date = pd.to_datetime(data[col], errors='coerce', format='%Y-%m-%d')
-                                        not_future = valid_date <= datetime.now()
-                                        return (valid_format & valid_date.notnull() & not_future).mean() * 100
-                                    except:
-                                        return valid_format.mean() * 100
-                                elif col == 'devise':
-                                    return data[col].str.match(r'^[A-Z]{3}$', na=False).mean() * 100
-                                return 100
-                            conformity = sum(check_conformity(col, df) for col in conformity_cols) / len(conformity_cols) if conformity_cols else 100
+                            conformity = round(sum(check_conformity(col, df) for col in conformity_cols) / len(conformity_cols)) if conformity_cols else 100
 
                             # Uniqueness
-                            uniqueness = (df[uniqueness_cols].nunique() / df[uniqueness_cols].notnull().count() * 100).mean()
+                            uniqueness = round((df[uniqueness_cols].nunique() / df[uniqueness_cols].notnull().count() * 100).mean())
 
                             # Validity
-                            def check_validity(col, data):
-                                try:
-                                    if col in ['pp_revenu', 'solde', 'interet_annuel', 'mnt_bloq', 'cre_mnt_deb', 'gar_tot', 'mnt_cap', 'mnt_int', 'mnt_remb_cap', 'mnt_remb_int', 'montant']:
-                                        return (pd.to_numeric(data[col], errors='coerce').notnull() & 
-                                                (pd.to_numeric(data[col], errors='coerce') >= 0)).mean() * 100
-                                    elif col in ['pp_nationalite', 'pp_etat_civil', 'id_loc1', 'etat', 'cre_etat', 'sens', 'devise']:
-                                        return data[col].notnull().mean() * 100
-                                    else:
-                                        return (pd.to_numeric(data[col], errors='coerce').notnull() & 
-                                                (pd.to_numeric(data[col], errors='coerce') >= 0) & 
-                                                pd.to_numeric(data[col], errors='coerce').eq(pd.to_numeric(data[col], errors='coerce').astype(int))).mean() * 100
-                                except Exception as e:
-                                    st.error(f"Validity check failed for {col}: {str(e)}")
-                                    return 0
-                            validity = sum(check_validity(col, df) for col in validity_cols) / len(validity_cols)
+                            validity = round(sum(check_validity(col, df) for col in validity_cols) / len(validity_cols)) if validity_cols else 100
 
                             # Integrity
-                            unique_non_null = len(df[integrity_cols].drop_duplicates().dropna(how='all')) / total_rows * 100
+                            unique_non_null = round(len(df[integrity_cols].drop_duplicates().dropna(how='all')) / total_rows * 100)
 
                             metrics_dict[table] = [completeness, conformity, uniqueness, validity, unique_non_null]
                         else:
@@ -406,39 +425,11 @@ if st.button('Submit'):
                     # Completeness
                     completeness = round((df[completeness_cols].notnull().mean() * 100).mean())
                     # Conformity
-                    def check_conformity(col, data):
-                        if col == 'email':
-                            return data[col].str.contains(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', na=False).mean() * 100
-                        elif col in ['pp_date_naissance', 'date_adh', 'date_ouvert', 'date_dem', 'cre_date_debloc', 'date_ech', 'date_remb', 'date_valeur']:
-                            valid_format = data[col].astype(str).str.match(r'^\d{4}-\d{2}-\d{2}$', na=False)
-                            try:
-                                valid_date = pd.to_datetime(data[col], errors='coerce', format='%Y-%m-%d')
-                                not_future = valid_date <= datetime.now()
-                                return (valid_format & valid_date.notnull() & not_future).mean() * 100
-                            except:
-                                return valid_format.mean() * 100
-                        elif col == 'devise':
-                            return data[col].str.match(r'^[A-Z]{3}$', na=False).mean() * 100
-                        return 100
                     conformity = round(sum(check_conformity(col, df) for col in conformity_cols) / len(conformity_cols)) if conformity_cols else 100
                     # Uniqueness
                     uniqueness = round((df[uniqueness_cols].nunique() / df[uniqueness_cols].notnull().count() * 100).mean())
                     # Validity
-                    def check_validity(col, data):
-                        try:
-                            if col in ['pp_revenu', 'solde', 'interet_annuel', 'mnt_bloq', 'cre_mnt_deb', 'gar_tot', 'mnt_cap', 'mnt_int', 'mnt_remb_cap', 'mnt_remb_int', 'montant']:
-                                return (pd.to_numeric(data[col], errors='coerce').notnull() & 
-                                        (pd.to_numeric(data[col], errors='coerce') >= 0)).mean() * 100
-                            elif col in ['pp_nationalite', 'pp_etat_civil', 'id_loc1', 'etat', 'cre_etat', 'sens', 'devise']:
-                                return data[col].notnull().mean() * 100
-                            else:
-                                return (pd.to_numeric(data[col], errors='coerce').notnull() & 
-                                        (pd.to_numeric(data[col], errors='coerce') >= 0) & 
-                                        pd.to_numeric(data[col], errors='coerce').eq(pd.to_numeric(data[col], errors='coerce').astype(int))).mean() * 100
-                        except Exception as e:
-                            st.error(f"Validity check failed for {col}: {str(e)}")
-                            return 0
-                    validity = round(sum(check_validity(col, df) for col in validity_cols) / len(validity_cols))
+                    validity = round(sum(check_validity(col, df) for col in validity_cols) / len(validity_cols)) if validity_cols else 100
                     # Integrity
                     unique_non_null = round(len(df[integrity_cols].drop_duplicates().dropna(how='all')) / total_rows * 100)
                     metrics = [completeness, conformity, uniqueness, validity, unique_non_null]
@@ -475,7 +466,7 @@ if st.session_state.data_processed and st.session_state.metrics and st.session_s
             x=['Completeness', 'Conformity', 'Uniqueness', 'Validity', 'Integrity'],
             y=st.session_state.metrics,
             marker_color=colors,
-            text=[f'{val:.0f}%' for val in st.session_state.metrics],
+            text=[f'{val}%' for val in st.session_state.metrics],
             textposition='auto'
         )
     ])
@@ -519,6 +510,7 @@ if st.session_state.data_processed and st.session_state.metrics and st.session_s
 if st.session_state.show_details and st.session_state.data_processed and st.session_state.details_data:
     with st.spinner('Generating detailed metrics table...'):
         try:
+            st.subheader('Detailed Metrics by Column')
             for table in st.session_state.selected_tables:
                 if table in st.session_state.details_data:
                     st.write(f"Table: {table}")
@@ -538,20 +530,6 @@ if st.session_state.show_details and st.session_state.data_processed and st.sess
                         if col in df.columns:
                             details[col]['Completeness'] = round(df[col].notnull().mean() * 100)
 
-                    def check_conformity(col, data):
-                        if col == 'email':
-                            return round(data[col].str.contains(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', na=False).mean() * 100)
-                        elif col in ['pp_date_naissance', 'date_adh', 'date_ouvert', 'date_dem', 'cre_date_debloc', 'date_ech', 'date_remb', 'date_valeur']:
-                            valid_format = data[col].astype(str).str.match(r'^\d{4}-\d{2}-\d{2}$', na=False)
-                            try:
-                                valid_date = pd.to_datetime(data[col], errors='coerce', format='%Y-%m-%d')
-                                not_future = valid_date <= datetime.now()
-                                return round((valid_format & valid_date.notnull() & not_future).mean() * 100)
-                            except:
-                                return round(valid_format.mean() * 100)
-                        elif col == 'devise':
-                            return round(data[col].str.match(r'^[A-Z]{3}$', na=False).mean() * 100)
-                        return 100
                     for col in conformity_cols:
                         if col in df.columns:
                             details[col]['Conformity'] = check_conformity(col, df)
@@ -560,20 +538,6 @@ if st.session_state.show_details and st.session_state.data_processed and st.sess
                         if col in df.columns:
                             details[col]['Uniqueness'] = round(df[col].nunique() / df[col].notnull().count() * 100 if df[col].notnull().count() > 0 else 100)
 
-                    def check_validity(col, data):
-                        try:
-                            if col in ['pp_revenu', 'solde', 'interet_annuel', 'mnt_bloq', 'cre_mnt_deb', 'gar_tot', 'mnt_cap', 'mnt_int', 'mnt_remb_cap', 'mnt_remb_int', 'montant']:
-                                return round((pd.to_numeric(data[col], errors='coerce').notnull() & 
-                                              (pd.to_numeric(data[col], errors='coerce') >= 0)).mean() * 100)
-                            elif col in ['pp_nationalite', 'pp_etat_civil', 'id_loc1', 'etat', 'cre_etat', 'sens', 'devise']:
-                                return round(data[col].notnull().mean() * 100)
-                            else:
-                                return round((pd.to_numeric(data[col], errors='coerce').notnull() & 
-                                              (pd.to_numeric(data[col], errors='coerce') >= 0) & 
-                                              pd.to_numeric(data[col], errors='coerce').eq(pd.to_numeric(data[col], errors='coerce').astype(int))).mean() * 100)
-                        except Exception as e:
-                            st.error(f"Validity check failed for {col}: {str(e)}")
-                            return 0
                     for col in validity_cols:
                         if col in df.columns:
                             details[col]['Validity'] = check_validity(col, df)
@@ -611,7 +575,3 @@ if st.session_state.show_details and st.session_state.data_processed and st.sess
                     st.error(f"No data available for table {table}.")
         except Exception as e:
             st.error(f"Error generating detailed metrics table: {str(e)}")
-
-
-
-
